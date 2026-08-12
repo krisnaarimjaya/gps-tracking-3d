@@ -1,544 +1,726 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracking & Precision Marking</title>
-    
-    <!-- MapLibre GL CSS -->
-    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-    
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-        }
-        body, html {
-            height: 100%;
-            width: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #111;
-            overflow: hidden;
-        }
-        #map {
-            height: 100vh;
-            width: 100vw;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GPS Marking & Tracking</title>
 
-        /* CROSSHAIR PIN MERAH DENGAN ANCHOR PRESISI */
-        .center-crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            z-index: 100;
-            pointer-events: none;
-            width: 32px;
-            height: 32px;
-            /* Mengunci UJUNG BAWAH PIN tepat di piksel tengah (0,0) tanpa leretan animasi (no transition) */
-            transform: translate(-50%, -100%);
-        }
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+ integrity="sha256-p4NxAoJBhIINfQ3b0l0R0J4eQ9k5w1Y5w6G8J4n6Y3Y="
+ crossorigin=""/>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css">
 
-        .center-crosshair svg {
-            width: 32px;
-            height: 32px;
-            display: block;
-        }
+<style>
+:root{
+  --panel:#ffffff;
+  --text:#17202a;
+  --muted:#64748b;
+  --line:#dbe2ea;
+  --accent:#2563eb;
+  --danger:#dc2626;
+  --ok:#16a34a;
+  --shadow:0 4px 18px rgba(0,0,0,.16);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text)}
+body{overflow:hidden;background:#e5e7eb}
+#map2d,#map3d{position:absolute;inset:0}
+#map3d{display:none}
 
-        /* Stats Panel Header */
-        .stats-panel {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            z-index: 10;
-            background: rgba(255, 255, 255, 0.92);
-            padding: 10px 14px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            backdrop-filter: blur(8px);
-            font-size: 12px;
-            line-height: 1.4;
-            color: #222;
-        }
+.topbar{
+  position:absolute;z-index:1000;top:10px;left:10px;right:10px;
+  display:flex;align-items:center;gap:8px;pointer-events:none;
+}
+.title{
+  background:rgba(255,255,255,.95);padding:9px 12px;border-radius:12px;
+  box-shadow:var(--shadow);font-weight:700;font-size:15px;pointer-events:auto;
+}
+.status{
+  background:rgba(255,255,255,.95);padding:8px 10px;border-radius:12px;
+  box-shadow:var(--shadow);font-size:12px;color:var(--muted);pointer-events:auto;
+}
+.spacer{flex:1}
+.controls{
+  position:absolute;z-index:1000;right:10px;top:68px;
+  display:flex;flex-direction:column;gap:7px;
+}
+button{
+  border:0;background:var(--panel);color:var(--text);border-radius:11px;
+  min-width:44px;min-height:44px;padding:8px 10px;box-shadow:var(--shadow);
+  cursor:pointer;font:inherit;font-size:13px;
+}
+button:active{transform:scale(.97)}
+button.primary{background:var(--accent);color:white}
+button.danger{background:var(--danger);color:white}
+button.ok{background:var(--ok);color:white}
+button.small{min-height:38px;padding:6px 9px}
+.icon{width:20px;height:20px;display:block;margin:auto}
+.btnText{display:block;margin-top:2px}
 
-        /* Floating Button "Lokasi Saya" */
-        .btn-my-location {
-            position: absolute;
-            right: 12px;
-            bottom: 90px;
-            z-index: 10;
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: #ffffff;
-            border: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            color: #007bff;
-        }
-        .btn-my-location:active {
-            transform: scale(0.92);
-            background: #f0f0f0;
-        }
-        
-        /* Control Dock Bottom Bar */
-        .controls {
-            position: absolute;
-            bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            justify-content: space-around;
-            gap: 4px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 8px 12px;
-            border-radius: 28px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-            backdrop-filter: blur(10px);
-            width: calc(100vw - 24px);
-            max-width: 420px;
-        }
+.bottom{
+  position:absolute;z-index:1000;left:10px;right:10px;bottom:10px;
+  display:flex;gap:8px;align-items:end;
+}
+.panel{
+  background:rgba(255,255,255,.96);border-radius:14px;box-shadow:var(--shadow);
+  padding:10px;backdrop-filter:blur(8px);
+}
+.info{min-width:250px;max-width:calc(100vw - 20px)}
+.infoRow{display:flex;justify-content:space-between;gap:16px;font-size:12px;padding:2px 0}
+.infoRow span:first-child{color:var(--muted)}
+.actions{display:flex;gap:7px;flex-wrap:wrap}
+.hidden{display:none!important}
 
-        .btn-icon {
-            border: none;
-            background: transparent;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            font-weight: 600;
-            color: #444;
-            cursor: pointer;
-        }
-        .btn-icon svg {
-            width: 20px;
-            height: 20px;
-            fill: currentColor;
-        }
-
-        #btnTrack { color: #2ec4b6; }
-        #btnTrack.recording { color: #e71d36; animation: pulse 1.5s infinite; }
-        #btn3D { color: #ff9f1c; }
-        #btnPoi { color: #3a86ff; }
-        #btnExport { color: #8338ec; }
-        #btnImport { color: #ff006e; }
-        #btnClear { color: #6c757d; }
-
-        /* Modal Form POI */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .modal-content {
-            background: white;
-            padding: 20px;
-            border-radius: 16px;
-            width: 100%;
-            max-width: 340px;
-        }
-        .modal-content input, .modal-content textarea {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 13px;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
-        }
-    </style>
+.dialog{
+  position:absolute;z-index:2000;inset:0;background:rgba(0,0,0,.35);
+  display:flex;align-items:center;justify-content:center;padding:18px;
+}
+.dialogCard{
+  width:min(520px,100%);max-height:85vh;overflow:auto;background:white;border-radius:16px;
+  box-shadow:0 15px 50px rgba(0,0,0,.28);padding:16px;
+}
+.dialogHeader{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dialogHeader h3{margin:0}
+.list{margin-top:10px;border-top:1px solid var(--line)}
+.item{
+  display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);
+  font-size:13px;
+}
+.item b{display:block}
+.item small{color:var(--muted)}
+.badge{padding:3px 7px;border-radius:99px;background:#eef2ff;color:#3730a3;font-size:11px}
+input[type=file]{display:none}
+.notice{
+  position:absolute;z-index:1500;left:50%;top:68px;transform:translateX(-50%);
+  background:#111827;color:#fff;padding:8px 12px;border-radius:10px;font-size:12px;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.notice.show{opacity:1}
+.leaflet-control-attribution{font-size:9px}
+.gps-dot{
+  width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid white;
+  box-shadow:0 0 0 7px rgba(37,99,235,.18),0 2px 6px rgba(0,0,0,.25);
+}
+.gps-arrow{
+  width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;
+  border-bottom:18px solid #2563eb;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));
+}
+</style>
 </head>
+
 <body>
+<div id="map2d"></div>
+<div id="map3d"></div>
 
-    <!-- Panel Status -->
-    <div class="stats-panel">
-        <strong>GPS HP:</strong> <span id="status">Mencari...</span> (<span id="accuracy">-</span>m)<br>
-        <strong>Track:</strong> <span id="pointCount">0</span> ptn | <strong>POI:</strong> <span id="poiCount">0</span><br>
-        <strong>Mode:</strong> <span id="mode3DStatus">Datar (2D)</span>
+<div class="topbar">
+  <div class="title">GPS Marking & Tracking</div>
+  <div class="status" id="status">GPS belum aktif</div>
+  <div class="spacer"></div>
+</div>
+
+<div class="controls">
+  <button id="btnGps" class="primary" title="Aktifkan GPS" aria-label="Aktifkan GPS">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+    </svg>
+  </button>
+  <button id="btnFollow" title="Ikuti posisi GPS" aria-label="Ikuti posisi GPS">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2l4 9-4 11-4-11 4-9z"/><circle cx="12" cy="12" r="2"/>
+    </svg>
+  </button>
+  <button id="btnMode" title="2D / 3D" aria-label="2D atau 3D">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 4 6 4 9s-1 6-4 9c-3-3-4-6-4-9s1-6 4-9z"/>
+    </svg>
+  </button>
+  <button id="btnMark" class="ok" title="Tandai posisi sekarang" aria-label="Tandai posisi sekarang">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 21s7-6.1 7-12a7 7 0 10-14 0c0 5.9 7 12 7 12z"/><circle cx="12" cy="9" r="2.2"/>
+    </svg>
+  </button>
+  <button id="btnTrack" title="Mulai / hentikan tracking" aria-label="Mulai atau hentikan tracking">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="6" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="6" r="2"/>
+      <path d="M7.5 16.5l3-3M13.5 10.5l3-3"/>
+    </svg>
+  </button>
+  <button id="btnData" title="Data tersimpan" aria-label="Data tersimpan">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 4h16v16H4z"/><path d="M8 4v5h8V4M8 15h8M8 18h5"/>
+    </svg>
+  </button>
+  <button id="btnExport" title="Ekspor GeoJSON" aria-label="Ekspor GeoJSON">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 20h14"/>
+    </svg>
+  </button>
+  <button id="btnImport" title="Impor GeoJSON" aria-label="Impor GeoJSON">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 20h14"/>
+    </svg>
+  </button>
+  <input id="fileInput" type="file" accept=".geojson,.json,application/geo+json,application/json">
+  <button id="btnClear" class="danger" title="Hapus semua data" aria-label="Hapus semua data">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>
+    </svg>
+  </button>
+</div>
+
+<div class="bottom">
+  <div class="panel info">
+    <div class="infoRow"><span>Latitude</span><b id="lat">-</b></div>
+    <div class="infoRow"><span>Longitude</span><b id="lon">-</b></div>
+    <div class="infoRow"><span>Akurasi</span><b id="acc">-</b></div>
+    <div class="infoRow"><span>Tracking</span><b id="trackInfo">Tidak aktif</b></div>
+  </div>
+</div>
+
+<div id="notice" class="notice"></div>
+
+<div id="dataDialog" class="dialog hidden">
+  <div class="dialogCard">
+    <div class="dialogHeader">
+      <h3>Data tersimpan</h3>
+      <button id="closeDialog" class="small" aria-label="Tutup">✕</button>
     </div>
+    <div id="dataList" class="list"></div>
+  </div>
+</div>
 
-    <!-- CROSSHAIR PIN MERAH STATIS (Pusat Layar Presisi) -->
-    <div class="center-crosshair">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#E71D36" stroke="#FFFFFF" stroke-width="1"/>
-        </svg>
-    </div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+ integrity="sha256-20nQCchB9co0qIjJZRGuk2/Q3KcJq8fM9r5Q5r6n2rQ="
+ crossorigin=""></script>
+<script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
 
-    <div id="map"></div>
+<script>
+(() => {
+  "use strict";
 
-    <!-- Tombol Lokasi Saya -->
-    <button class="btn-my-location" onclick="centerToUserLocation()" title="Ke Lokasi Saya">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
-        </svg>
-    </button>
+  const STORAGE_KEY = "gps_marking_tracking_v1";
+  const state = {
+    gps: null,
+    watchId: null,
+    tracking: false,
+    track: [],
+    marks: [],
+    mode3d: false,
+    follow: true,
+    trackLayer: null,
+    gpsMarker: null,
+    accuracyCircle: null,
+    marksLayer: null,
+    map3dMarker: null
+  };
 
-    <!-- Bottom Controls -->
-    <div class="controls">
-        <button class="btn-icon" id="btnTrack" onclick="toggleTracking()">
-            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><circle cx="12" cy="12" r="5"/></svg>
-            <span id="txtTrack">Rekam</span>
-        </button>
+  const $ = id => document.getElementById(id);
+  const statusEl = $("status");
 
-        <button class="btn-icon" id="btn3D" onclick="toggle3D()">
-            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            <span>3D</span>
-        </button>
+  function notify(msg){
+    const el = $("notice");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(notify.t);
+    notify.t = setTimeout(() => el.classList.remove("show"), 2300);
+  }
 
-        <button class="btn-icon" id="btnPoi" onclick="addPOIAtCenter()">
-            <svg viewBox="0 0 24 24"><path d="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-            <span>Marking</span>
-        </button>
+  function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return;
+      const obj = JSON.parse(raw);
+      state.marks = Array.isArray(obj.marks) ? obj.marks : [];
+      state.track = Array.isArray(obj.track) ? obj.track : [];
+    }catch(e){
+      console.warn(e);
+    }
+  }
 
-        <button class="btn-icon" id="btnExport" onclick="exportJSON()">
-            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-            <span>Export</span>
-        </button>
+  function saveData(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      version: 1,
+      marks: state.marks,
+      track: state.track
+    }));
+  }
 
-        <button class="btn-icon" id="btnImport" onclick="document.getElementById('fileInput').click()">
-            <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
-            <span>Import</span>
-        </button>
+  const map2d = L.map("map2d", {
+    zoomControl: false,
+    preferCanvas: true
+  }).setView([-2.5, 118], 5);
 
-        <button class="btn-icon" id="btnClear" onclick="clearData()">
-            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-            <span>Hapus</span>
-        </button>
-        
-        <input type="file" id="fileInput" accept=".json" style="display:none" onchange="importJSON(event)">
-    </div>
+  L.control.zoom({position:"bottomright"}).addTo(map2d);
 
-    <!-- Modal Form POI -->
-    <div id="poiModal" class="modal">
-        <div class="modal-content">
-            <h3 style="font-size:15px; margin-bottom:8px;">Tambah POI di Titik Tengah</h3>
-            <p style="font-size:11px; color:#666; margin-bottom:10px;" id="poiCoordsText">Koordinat: -</p>
-            <input type="text" id="poiTitle" placeholder="Nama Tempat / POI" required>
-            <textarea id="poiDesc" rows="3" placeholder="Keterangan singkat..."></textarea>
-            <div style="display:flex; justify-content:flex-end; gap:8px;">
-                <button type="button" style="background:#6c757d; color:white; border:none; padding:8px 12px; border-radius:6px;" onclick="closeModal()">Batal</button>
-                <button type="button" style="background:#2ec4b6; color:white; border:none; padding:8px 12px; border-radius:6px;" onclick="savePOI()">Simpan POI</button>
-            </div>
-        </div>
-    </div>
+  // OSM digunakan sebagai base map demo. Untuk produksi, gunakan tile provider
+  // yang mengizinkan penggunaan sesuai kapasitas/aplikasi Anda.
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map2d);
 
-    <!-- MapLibre GL JS -->
-    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-    
-    <script>
-        const map = new maplibregl.Map({
-            container: 'map',
-            style: {
-                version: 8,
-                sources: {
-                    'carto-tiles': {
-                        type: 'raster',
-                        tiles: [
-                            'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                            'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-                        ],
-                        tileSize: 256,
-                        attribution: '&copy; OpenStreetMap &copy; CARTO'
-                    }
-                },
-                layers: [{
-                    id: 'carto-layer',
-                    type: 'raster',
-                    source: 'carto-tiles',
-                    minzoom: 0,
-                    maxzoom: 22
-                }]
-            },
-            center: [106.816666, -6.200000],
-            zoom: 17,
-            pitch: 0
-        });
+  state.trackLayer = L.polyline([], {
+    color: "#2563eb",
+    weight: 4,
+    opacity: .85
+  }).addTo(map2d);
 
-        let userPos = null;
-        let selectedPoiPos = null;
-        let isRecording = false;
-        let firstFix = true;
-        let is3D = false;
-        let poiMarkersOnMap = [];
+  state.marksLayer = L.layerGroup().addTo(map2d);
 
-        let trackingData = {
-            track: [],
-            pois: []
-        };
+  const gpsIcon = L.divIcon({
+    className:"",
+    html:'<div class="gps-dot"></div>',
+    iconSize:[18,18],
+    iconAnchor:[9,9]
+  });
 
-        map.on('load', () => {
-            // Layer Titik GPS Asli Pengguna
-            map.addSource('user-location', {
-                type: 'geojson',
-                data: { type: 'FeatureCollection', features: [] }
-            });
-            map.addLayer({
-                id: 'user-location-layer',
-                type: 'circle',
-                source: 'user-location',
-                paint: {
-                    'circle-radius': 9,
-                    'circle-color': '#007bff',
-                    'circle-stroke-width': 3,
-                    'circle-stroke-color': '#ffffff'
-                }
-            });
+  function updateGpsOn2D(){
+    if(!state.gps) return;
+    const {lat, lon, accuracy} = state.gps;
 
-            // Track Line Layer
-            map.addSource('track-line', {
-                type: 'geojson',
-                data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } }
-            });
-            map.addLayer({
-                id: 'track-line-layer',
-                type: 'line',
-                source: 'track-line',
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#e71d36', 'line-width': 5 }
-            });
+    if(!state.gpsMarker){
+      state.gpsMarker = L.marker([lat,lon], {icon:gpsIcon, zIndexOffset:1000}).addTo(map2d);
+    }else{
+      state.gpsMarker.setLatLng([lat,lon]);
+    }
 
-            loadFromLocalStorage();
-        });
+    if(!state.accuracyCircle){
+      state.accuracyCircle = L.circle([lat,lon], {
+        radius: accuracy || 0,
+        color:"#2563eb",
+        weight:1,
+        fillOpacity:.08
+      }).addTo(map2d);
+    }else{
+      state.accuracyCircle.setLatLng([lat,lon]);
+      state.accuracyCircle.setRadius(accuracy || 0);
+    }
 
-        // Geolocation Watcher
-        if ('geolocation' in navigator) {
-            navigator.geolocation.watchPosition(onPositionSuccess, onPositionError, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
+    if(state.follow){
+      map2d.panTo([lat,lon], {animate:true, duration:.25});
+    }
+  }
+
+  function redrawTrack(){
+    state.trackLayer.setLatLngs(state.track.map(p => [p.lat,p.lon]));
+  }
+
+  function redrawMarks(){
+    state.marksLayer.clearLayers();
+    state.marks.forEach((m, i) => {
+      const marker = L.marker([m.lat,m.lon]).addTo(state.marksLayer);
+      marker.bindPopup(
+        `<b>${escapeHtml(m.name || "Mark " + (i+1))}</b><br>` +
+        `Lat: ${m.lat.toFixed(7)}<br>` +
+        `Lon: ${m.lon.toFixed(7)}<br>` +
+        `Akurasi: ${Number(m.accuracy || 0).toFixed(1)} m<br>` +
+        `<small>${new Date(m.timestamp).toLocaleString("id-ID")}</small>`
+      );
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[c]));
+  }
+
+  // ---------- 3D MapLibre ----------
+  const map3d = new maplibregl.Map({
+    container: "map3d",
+    style: {
+      version: 8,
+      sources: {
+        osm: {
+          type: "raster",
+          tiles: [
+            "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          ],
+          tileSize: 256,
+          attribution: "© OpenStreetMap contributors"
         }
+      },
+      layers: [
+        { id:"osm", type:"raster", source:"osm" }
+      ]
+    },
+    center: [118, -2.5],
+    zoom: 4
+  });
 
-        function onPositionSuccess(position) {
-            const lng = position.coords.longitude;
-            const lat = position.coords.latitude;
-            const accuracy = position.coords.accuracy;
+  map3d.addControl(new maplibregl.NavigationControl(), "bottom-right");
 
-            userPos = { lng, lat };
+  map3d.on("load", () => {
+    map3d.setProjection({type:"globe"});
+    add3DDataSources();
+  });
 
-            document.getElementById('status').innerText = "Aktif";
-            document.getElementById('accuracy').innerText = Math.round(accuracy);
+  function add3DDataSources(){
+    if(!map3d.getSource("track")) {
+      map3d.addSource("track", {
+        type:"geojson",
+        data: featureCollectionTrack()
+      });
+      map3d.addLayer({
+        id:"track-line",
+        type:"line",
+        source:"track",
+        paint:{
+          "line-color":"#2563eb",
+          "line-width":4
+        }
+      });
+    }
+    if(!map3d.getSource("marks")) {
+      map3d.addSource("marks", {
+        type:"geojson",
+        data: featureCollectionMarks()
+      });
+      map3d.addLayer({
+        id:"marks-circle",
+        type:"circle",
+        source:"marks",
+        paint:{
+          "circle-radius":6,
+          "circle-color":"#16a34a",
+          "circle-stroke-color":"#ffffff",
+          "circle-stroke-width":2
+        }
+      });
+    }
+  }
 
-            if (map.getSource('user-location')) {
-                map.getSource('user-location').setData({
-                    type: 'Feature',
-                    geometry: { type: 'Point', coordinates: [lng, lat] }
+  function featureCollectionTrack(){
+    return {
+      type:"FeatureCollection",
+      features: state.track.length >= 2 ? [{
+        type:"Feature",
+        properties:{type:"track"},
+        geometry:{
+          type:"LineString",
+          coordinates: state.track.map(p => [p.lon,p.lat])
+        }
+      }] : []
+    };
+  }
+
+  function featureCollectionMarks(){
+    return {
+      type:"FeatureCollection",
+      features: state.marks.map(m => ({
+        type:"Feature",
+        properties:{
+          name:m.name,
+          accuracy:m.accuracy,
+          timestamp:m.timestamp
+        },
+        geometry:{type:"Point",coordinates:[m.lon,m.lat]}
+      }))
+    };
+  }
+
+  function update3DData(){
+    if(!map3d.loaded()) return;
+    const t = map3d.getSource("track");
+    const m = map3d.getSource("marks");
+    if(t) t.setData(featureCollectionTrack());
+    if(m) m.setData(featureCollectionMarks());
+
+    if(state.gps){
+      const [lon,lat] = [state.gps.lon,state.gps.lat];
+      if(!state.map3dMarker){
+        const el = document.createElement("div");
+        el.className = "gps-dot";
+        state.map3dMarker = new maplibregl.Marker({element:el})
+          .setLngLat([lon,lat]).addTo(map3d);
+      }else{
+        state.map3dMarker.setLngLat([lon,lat]);
+      }
+      if(state.follow) map3d.easeTo({center:[lon,lat], duration:350});
+    }
+  }
+
+  function setMode3D(on){
+    state.mode3d = on;
+    $("map2d").style.display = on ? "none" : "block";
+    $("map3d").style.display = on ? "block" : "none";
+    $("btnMode").title = on ? "Kembali ke 2D" : "Beralih ke 3D";
+
+    if(on){
+      const c = state.gps ? [state.gps.lon,state.gps.lat] : map2d.getCenter().toArray().reverse();
+      map3d.resize();
+      map3d.jumpTo({center:c, zoom:Math.max(2,map2d.getZoom()-1)});
+      update3DData();
+      notify("Mode 3D aktif");
+    }else{
+      map2d.invalidateSize();
+      if(state.gps) map2d.setView([state.gps.lat,state.gps.lon], Math.max(map2d.getZoom(),16));
+      notify("Mode 2D aktif");
+    }
+  }
+
+  function startGPS(){
+    if(!navigator.geolocation){
+      notify("Perangkat/browser tidak mendukung GPS");
+      statusEl.textContent = "GPS tidak tersedia";
+      return;
+    }
+    if(state.watchId !== null) return;
+
+    statusEl.textContent = "Mengaktifkan GPS…";
+    state.watchId = navigator.geolocation.watchPosition(onPosition, onGpsError, {
+      enableHighAccuracy:true,
+      maximumAge:1000,
+      timeout:15000
+    });
+  }
+
+  function onPosition(pos){
+    const c = pos.coords;
+    state.gps = {
+      lat:c.latitude,
+      lon:c.longitude,
+      accuracy:Number.isFinite(c.accuracy) ? c.accuracy : null,
+      altitude:Number.isFinite(c.altitude) ? c.altitude : null,
+      heading:Number.isFinite(c.heading) ? c.heading : null,
+      speed:Number.isFinite(c.speed) ? c.speed : null,
+      timestamp:new Date(pos.timestamp || Date.now()).toISOString()
+    };
+
+    $("lat").textContent = state.gps.lat.toFixed(7);
+    $("lon").textContent = state.gps.lon.toFixed(7);
+    $("acc").textContent = state.gps.accuracy == null ? "-" : state.gps.accuracy.toFixed(1) + " m";
+    statusEl.textContent = "GPS aktif";
+
+    updateGpsOn2D();
+    update3DData();
+
+    if(state.tracking){
+      const last = state.track[state.track.length-1];
+      const minDistance = 2; // meter, mencegah terlalu banyak titik identik
+      if(!last || haversine(last.lat,last.lon,state.gps.lat,state.gps.lon) >= minDistance){
+        state.track.push({...state.gps});
+        redrawTrack();
+        update3DData();
+        saveData();
+      }
+      $("trackInfo").textContent = `${state.track.length} titik`;
+    }
+  }
+
+  function onGpsError(err){
+    const messages = {
+      1:"Izin lokasi ditolak",
+      2:"Posisi tidak tersedia",
+      3:"GPS timeout"
+    };
+    statusEl.textContent = messages[err.code] || "GPS error";
+    notify(messages[err.code] || "GPS error");
+  }
+
+  function haversine(lat1,lon1,lat2,lon2){
+    const R=6371008.8, rad=Math.PI/180;
+    const dLat=(lat2-lat1)*rad, dLon=(lon2-lon1)*rad;
+    const a=Math.sin(dLat/2)**2+
+      Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
+
+  function markPosition(){
+    if(!state.gps){
+      notify("Aktifkan GPS dan tunggu posisi diperoleh");
+      startGPS();
+      return;
+    }
+    const name = prompt("Nama marking:", `Mark ${state.marks.length+1}`);
+    if(name === null) return;
+
+    const m = {
+      id:crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      name:name.trim() || `Mark ${state.marks.length+1}`,
+      lat:state.gps.lat,
+      lon:state.gps.lon,
+      accuracy:state.gps.accuracy,
+      altitude:state.gps.altitude,
+      timestamp:state.gps.timestamp
+    };
+    state.marks.push(m);
+    saveData();
+    redrawMarks();
+    update3DData();
+    notify("Marking tersimpan");
+  }
+
+  function toggleTracking(){
+    if(!state.tracking){
+      startGPS();
+      state.tracking=true;
+      $("btnTrack").classList.add("danger");
+      $("trackInfo").textContent=`${state.track.length} titik`;
+      notify("Tracking dimulai");
+    }else{
+      state.tracking=false;
+      $("btnTrack").classList.remove("danger");
+      $("trackInfo").textContent=`${state.track.length} titik`;
+      saveData();
+      notify("Tracking dihentikan");
+    }
+  }
+
+  function makeGeoJSON(){
+    return {
+      type:"FeatureCollection",
+      name:"GPS Marking & Tracking",
+      features:[
+        ...state.marks.map(m => ({
+          type:"Feature",
+          properties:{
+            id:m.id,
+            name:m.name,
+            type:"marking",
+            accuracy_m:m.accuracy,
+            altitude_m:m.altitude,
+            timestamp:m.timestamp
+          },
+          geometry:{type:"Point",coordinates:[m.lon,m.lat]}
+        })),
+        ...(state.track.length >= 2 ? [{
+          type:"Feature",
+          properties:{
+            type:"tracking",
+            point_count:state.track.length,
+            started_at:state.track[0]?.timestamp || null,
+            ended_at:state.track[state.track.length-1]?.timestamp || null
+          },
+          geometry:{
+            type:"LineString",
+            coordinates:state.track.map(p=>[p.lon,p.lat])
+          }
+        }] : [])
+      ]
+    };
+  }
+
+  function exportGeoJSON(){
+    const geojson=makeGeoJSON();
+    const blob=new Blob([JSON.stringify(geojson,null,2)],{type:"application/geo+json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`gps_${new Date().toISOString().replace(/[:.]/g,"-")}.geojson`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify("GeoJSON diekspor");
+  }
+
+  function importGeoJSON(file){
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const gj=JSON.parse(reader.result);
+        const features=gj.type==="FeatureCollection" ? gj.features :
+          gj.type==="Feature" ? [gj] : [];
+
+        let marksAdded=0, tracksAdded=0;
+
+        for(const f of features){
+          if(!f || !f.geometry) continue;
+          const type=f.geometry.type;
+          const props=f.properties || {};
+
+          if(type==="Point"){
+            const [lon,lat]=f.geometry.coordinates;
+            if(Number.isFinite(lat)&&Number.isFinite(lon)){
+              state.marks.push({
+                id:props.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+marksAdded)),
+                name:props.name || `Import ${state.marks.length+1}`,
+                lat,lon,
+                accuracy:props.accuracy_m ?? null,
+                altitude:props.altitude_m ?? null,
+                timestamp:props.timestamp || new Date().toISOString()
+              });
+              marksAdded++;
+            }
+          }else if(type==="LineString"){
+            for(const c of f.geometry.coordinates){
+              if(Array.isArray(c)&&c.length>=2){
+                state.track.push({
+                  lat:Number(c[1]),lon:Number(c[0]),
+                  accuracy:null,altitude:null,
+                  timestamp:new Date().toISOString()
                 });
+              }
             }
-
-            if (firstFix) {
-                centerToUserLocation();
-                firstFix = false;
-            }
-
-            if (isRecording) {
-                trackingData.track.push([lng, lat, new Date().toISOString()]);
-                renderTrack();
-                saveToLocalStorage();
-            }
+            tracksAdded++;
+          }
         }
+        saveData(); redrawMarks(); redrawTrack(); update3DData();
+        notify(`Impor selesai: ${marksAdded} marking, ${tracksAdded} track`);
+      }catch(e){
+        console.error(e);
+        notify("File GeoJSON tidak valid");
+      }
+    };
+    reader.readAsText(file);
+  }
 
-        function onPositionError(err) {
-            document.getElementById('status').innerText = "Err: " + err.message;
-        }
+  function showData(){
+    const list=$("dataList");
+    list.innerHTML="";
+    const summary=document.createElement("div");
+    summary.className="item";
+    summary.innerHTML=`<div><b>Ringkasan</b><small>${state.marks.length} marking · ${state.track.length} titik tracking</small></div><span class="badge">GeoJSON</span>`;
+    list.appendChild(summary);
 
-        // Geser Pusat Peta Tepat ke Titik GPS HP
-        function centerToUserLocation() {
-            if (userPos) {
-                map.flyTo({ 
-                    center: [userPos.lng, userPos.lat], 
-                    zoom: 18,
-                    essential: true
-                });
-            } else {
-                alert("GPS belum terkunci.");
-            }
-        }
+    state.marks.forEach((m,i)=>{
+      const row=document.createElement("div");
+      row.className="item";
+      row.innerHTML=`<div><b>${escapeHtml(m.name)}</b><small>${m.lat.toFixed(7)}, ${m.lon.toFixed(7)}</small></div><span class="badge">Mark</span>`;
+      row.onclick=()=>{ map2d.setView([m.lat,m.lon],18); setMode3D(false); };
+      list.appendChild(row);
+    });
+    $("dataDialog").classList.remove("hidden");
+  }
 
-        function toggleTracking() {
-            isRecording = !isRecording;
-            const btn = document.getElementById('btnTrack');
-            const txt = document.getElementById('txtTrack');
-            if (isRecording) {
-                txt.innerText = "Stop";
-                btn.classList.add("recording");
-            } else {
-                txt.innerText = "Rekam";
-                btn.classList.remove("recording");
-            }
-        }
+  function clearAll(){
+    if(!confirm("Hapus semua marking dan tracking dari perangkat?")) return;
+    state.marks=[]; state.track=[];
+    saveData(); redrawMarks(); redrawTrack(); update3DData();
+    $("trackInfo").textContent="Tidak aktif";
+    notify("Semua data dihapus");
+  }
 
-        function toggle3D() {
-            is3D = !is3D;
-            map.easeTo({ pitch: is3D ? 60 : 0, duration: 600 });
-            document.getElementById('mode3DStatus').innerText = is3D ? "3D (60°)" : "Datar (2D)";
-        }
+  $("btnGps").onclick=startGPS;
+  $("btnFollow").onclick=()=>{
+    state.follow=!state.follow;
+    $("btnFollow").classList.toggle("primary",state.follow);
+    if(state.follow && state.gps){
+      if(state.mode3d) map3d.easeTo({center:[state.gps.lon,state.gps.lat]});
+      else map2d.panTo([state.gps.lat,state.gps.lon]);
+    }
+  };
+  $("btnMode").onclick=()=>setMode3D(!state.mode3d);
+  $("btnMark").onclick=markPosition;
+  $("btnTrack").onclick=toggleTracking;
+  $("btnData").onclick=showData;
+  $("btnExport").onclick=exportGeoJSON;
+  $("btnImport").onclick=()=>$("fileInput").click();
+  $("fileInput").onchange=e=>{
+    if(e.target.files[0]) importGeoJSON(e.target.files[0]);
+    e.target.value="";
+  };
+  $("btnClear").onclick=clearAll;
+  $("closeDialog").onclick=()=>$("dataDialog").classList.add("hidden");
+  $("dataDialog").onclick=e=>{if(e.target===$("dataDialog")) $("dataDialog").classList.add("hidden")};
 
-        // Buka Modal Marking berdasarkan koordinat persis pusat peta (ujung jarum pin merah)
-        function addPOIAtCenter() {
-            const center = map.getCenter();
-            selectedPoiPos = { lng: center.lng, lat: center.lat };
+  loadData();
+  redrawMarks();
+  redrawTrack();
+  $("trackInfo").textContent=`${state.track.length} titik`;
+  map2d.on("dragstart",()=>state.follow=false);
 
-            document.getElementById('poiCoordsText').innerText = `Koordinat: ${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`;
-            document.getElementById('poiTitle').value = '';
-            document.getElementById('poiDesc').value = '';
-            document.getElementById('poiModal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('poiModal').style.display = 'none';
-        }
-
-        function savePOI() {
-            const title = document.getElementById('poiTitle').value.trim();
-            const desc = document.getElementById('poiDesc').value.trim();
-
-            if (!title) {
-                alert("Nama POI wajib diisi!");
-                return;
-            }
-
-            const newPoi = {
-                id: Date.now(),
-                title: title,
-                desc: desc,
-                lng: selectedPoiPos.lng,
-                lat: selectedPoiPos.lat,
-                timestamp: new Date().toISOString()
-            };
-
-            trackingData.pois.push(newPoi);
-            renderPois();
-            saveToLocalStorage();
-            closeModal();
-        }
-
-        function renderTrack() {
-            const coords = trackingData.track.map(p => [p[0], p[1]]);
-            if (map.getSource('track-line')) {
-                map.getSource('track-line').setData({
-                    type: 'Feature',
-                    geometry: { type: 'LineString', coordinates: coords }
-                });
-            }
-            document.getElementById('pointCount').innerText = trackingData.track.length;
-        }
-
-        // Render POI menggunakan MapLibre Marker HTML agar anchor 'bottom' presisi 100%
-        function renderPois() {
-            // Hapus marker lama dari layar
-            poiMarkersOnMap.forEach(m => m.remove());
-            poiMarkersOnMap = [];
-
-            trackingData.pois.forEach(poi => {
-                // Buat elemen visual marker (Pin Oranye untuk membedakan dari Pin Merah Crosshair)
-                const el = document.createElement('div');
-                el.className = 'custom-poi-marker';
-                el.innerHTML = `
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#FF9F1C" stroke="#000" stroke-width="1">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                    </svg>
-                `;
-
-                const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
-                    <div style="color:#222; font-size:12px;">
-                        <strong style="color:#ff9f1c; font-size:13px;">📍 ${poi.title}</strong><br>
-                        ${poi.desc ? `<p style="margin:3px 0;">${poi.desc}</p>` : ''}
-                        <small style="color:#666;">${new Date(poi.timestamp).toLocaleString('id-ID')}</small>
-                    </div>
-                `);
-
-                const marker = new maplibregl.Marker({
-                    element: el,
-                    anchor: 'bottom' // Kunci ujung bawah pin tepat di koordinatnya
-                })
-                .setLngLat([poi.lng, poi.lat])
-                .setPopup(popup)
-                .addTo(map);
-
-                poiMarkersOnMap.push(marker);
-            });
-
-            document.getElementById('poiCount').innerText = trackingData.pois.length;
-        }
-
-        function saveToLocalStorage() {
-            localStorage.setItem('maplibre_gps_data', JSON.stringify(trackingData));
-        }
-
-        function loadFromLocalStorage() {
-            const saved = localStorage.getItem('maplibre_gps_data');
-            if (saved) {
-                try {
-                    trackingData = JSON.parse(saved);
-                    renderTrack();
-                    renderPois();
-                } catch (e) {
-                    console.error(e);
-                }
-            }
-        }
-
-        function exportJSON() {
-            if (trackingData.track.length === 0 && trackingData.pois.length === 0) {
-                alert("Tidak ada data untuk diexport.");
-                return;
-            }
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trackingData, null, 2));
-            const dl = document.createElement('a');
-            dl.setAttribute("href", dataStr);
-            dl.setAttribute("download", `gps_export_${new Date().toISOString().slice(0,10)}.json`);
-            dl.click();
-        }
-
-        function importJSON(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    trackingData = { track: data.track || [], pois: data.pois || [] };
-                    renderTrack();
-                    renderPois();
-                    saveToLocalStorage();
-                    alert("Import berhasil!");
-                } catch (err) {
-                    alert("Format JSON tidak valid.");
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        function clearData() {
-            if (confirm("Hapus seluruh data track dan POI?")) {
-                trackingData = { track: [], pois: [] };
-                renderTrack();
-                renderPois();
-                localStorage.removeItem('maplibre_gps_data');
-            }
-        }
-    </script>
+  // Minta izin GPS hanya setelah user menekan tombol, agar lebih sesuai kebijakan browser.
+})();
+</script>
 </body>
 </html>
