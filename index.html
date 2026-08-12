@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracking 3D Terrain - MapLibre & Carto</title>
+    <title>GPS Tracking & Precision Marking</title>
     
     <!-- MapLibre GL CSS -->
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
@@ -18,7 +18,7 @@
         body, html {
             height: 100%;
             width: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #111;
             overflow: hidden;
         }
@@ -27,29 +27,26 @@
             width: 100vw;
         }
 
-        /* Container Crosshair Single Element (Presisi Tanpa Terpisah) */
+        /* CROSSHAIR PIN MERAH DENGAN ANCHOR PRESISI */
         .center-crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
-            z-index: 10;
+            z-index: 100;
             pointer-events: none;
-            /* Ujung bawah lancip pin ditempatkan tepat di koordinat (0,0) pusat layar */
+            width: 32px;
+            height: 32px;
+            /* Mengunci UJUNG BAWAH PIN tepat di piksel tengah (0,0) tanpa leretan animasi (no transition) */
             transform: translate(-50%, -100%);
-            width: 36px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.15s ease;
         }
 
-        /* Animasi saat peta digeser/diseret */
-        .map-dragging {
-            transform: translate(-50%, -115%) scale(1.08);
+        .center-crosshair svg {
+            width: 32px;
+            height: 32px;
+            display: block;
         }
-        
-        /* Stats Panel Header Top */
+
+        /* Stats Panel Header */
         .stats-panel {
             position: absolute;
             top: 12px;
@@ -63,7 +60,6 @@
             font-size: 12px;
             line-height: 1.4;
             color: #222;
-            max-width: 240px;
         }
 
         /* Floating Button "Lokasi Saya" */
@@ -83,10 +79,9 @@
             justify-content: center;
             cursor: pointer;
             color: #007bff;
-            transition: all 0.2s ease;
         }
         .btn-my-location:active {
-            transform: scale(0.9);
+            transform: scale(0.92);
             background: #f0f0f0;
         }
         
@@ -100,7 +95,7 @@
             display: flex;
             align-items: center;
             justify-content: space-around;
-            gap: 6px;
+            gap: 4px;
             background: rgba(255, 255, 255, 0.95);
             padding: 8px 12px;
             border-radius: 28px;
@@ -124,25 +119,15 @@
             font-weight: 600;
             color: #444;
             cursor: pointer;
-            transition: all 0.2s ease;
-            gap: 2px;
         }
         .btn-icon svg {
             width: 20px;
             height: 20px;
             fill: currentColor;
         }
-        .btn-icon:active {
-            transform: scale(0.9);
-            background: rgba(0,0,0,0.05);
-        }
 
-        /* Specific Button Highlight Colors */
         #btnTrack { color: #2ec4b6; }
-        #btnTrack.recording {
-            color: #e71d36;
-            animation: pulse 1.5s infinite;
-        }
+        #btnTrack.recording { color: #e71d36; animation: pulse 1.5s infinite; }
         #btn3D { color: #ff9f1c; }
         #btnPoi { color: #3a86ff; }
         #btnExport { color: #8338ec; }
@@ -166,12 +151,6 @@
             border-radius: 16px;
             width: 100%;
             max-width: 340px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        }
-        .modal-content h3 {
-            margin-bottom: 12px;
-            font-size: 15px;
-            color: #222;
         }
         .modal-content input, .modal-content textarea {
             width: 100%;
@@ -180,11 +159,6 @@
             border: 1px solid #ccc;
             border-radius: 8px;
             font-size: 13px;
-        }
-        .modal-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
         }
 
         @keyframes pulse {
@@ -196,32 +170,30 @@
 </head>
 <body>
 
-    <!-- Panel Informasi Status -->
+    <!-- Panel Status -->
     <div class="stats-panel">
-        <strong>GPS:</strong> <span id="status">Mencari...</span> (<span id="accuracy">-</span>m)<br>
+        <strong>GPS HP:</strong> <span id="status">Mencari...</span> (<span id="accuracy">-</span>m)<br>
         <strong>Track:</strong> <span id="pointCount">0</span> ptn | <strong>POI:</strong> <span id="poiCount">0</span><br>
-        <strong>Mode 3D:</strong> <span id="mode3DStatus">Datar (2D)</span>
+        <strong>Mode:</strong> <span id="mode3DStatus">Datar (2D)</span>
     </div>
 
-    <!-- Pemandu Crosshair Tunggal (Single SVG Pin) -->
-    <div class="center-crosshair" id="crosshair">
-        <svg width="36" height="48" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18 0C8.05887 0 0 8.05887 0 18C0 28.5 18 48 18 48C18 48 36 28.5 36 18C36 8.05887 27.9411 0 18 0ZM18 25C14.134 25 11 21.866 11 18C11 14.134 14.134 11 18 11C21.866 11 25 14.134 25 18C25 21.866 21.866 25 18 25Z" fill="#E71D36" filter="drop-shadow(0px 3px 3px rgba(0,0,0,0.3))"/>
-            <circle cx="18" cy="18" r="4" fill="white"/>
+    <!-- CROSSHAIR PIN MERAH STATIS (Pusat Layar Presisi) -->
+    <div class="center-crosshair">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#E71D36" stroke="#FFFFFF" stroke-width="1"/>
         </svg>
     </div>
 
-    <!-- Container Peta -->
     <div id="map"></div>
 
-    <!-- Tombol Floating: Lokasi Saya -->
-    <button class="btn-my-location" onclick="centerToUserLocation()" title="Lokasi Saya">
+    <!-- Tombol Lokasi Saya -->
+    <button class="btn-my-location" onclick="centerToUserLocation()" title="Ke Lokasi Saya">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
         </svg>
     </button>
 
-    <!-- Control Dock Bottom Bar -->
+    <!-- Bottom Controls -->
     <div class="controls">
         <button class="btn-icon" id="btnTrack" onclick="toggleTracking()">
             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><circle cx="12" cy="12" r="5"/></svg>
@@ -259,11 +231,11 @@
     <!-- Modal Form POI -->
     <div id="poiModal" class="modal">
         <div class="modal-content">
-            <h3>Tambah POI di Titik Tengah</h3>
+            <h3 style="font-size:15px; margin-bottom:8px;">Tambah POI di Titik Tengah</h3>
             <p style="font-size:11px; color:#666; margin-bottom:10px;" id="poiCoordsText">Koordinat: -</p>
             <input type="text" id="poiTitle" placeholder="Nama Tempat / POI" required>
             <textarea id="poiDesc" rows="3" placeholder="Keterangan singkat..."></textarea>
-            <div class="modal-actions">
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
                 <button type="button" style="background:#6c757d; color:white; border:none; padding:8px 12px; border-radius:6px;" onclick="closeModal()">Batal</button>
                 <button type="button" style="background:#2ec4b6; color:white; border:none; padding:8px 12px; border-radius:6px;" onclick="savePOI()">Simpan POI</button>
             </div>
@@ -274,7 +246,6 @@
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     
     <script>
-        // Init MapLibre GL
         const map = new maplibregl.Map({
             container: 'map',
             style: {
@@ -288,13 +259,6 @@
                         ],
                         tileSize: 256,
                         attribution: '&copy; OpenStreetMap &copy; CARTO'
-                    },
-                    'terrain-dem': {
-                        type: 'raster-dem',
-                        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-                        encoding: 'terrarium',
-                        tileSize: 256,
-                        maxzoom: 15
                     }
                 },
                 layers: [{
@@ -303,37 +267,27 @@
                     source: 'carto-tiles',
                     minzoom: 0,
                     maxzoom: 22
-                }],
-                terrain: {
-                    source: 'terrain-dem',
-                    exaggeration: 1.5
-                }
+                }]
             },
             center: [106.816666, -6.200000],
-            zoom: 16,
-            pitch: 0,
-            bearing: 0
+            zoom: 17,
+            pitch: 0
         });
-
-        map.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showCompass: true }), 'top-right');
 
         let userPos = null;
         let selectedPoiPos = null;
         let isRecording = false;
         let firstFix = true;
         let is3D = false;
+        let poiMarkersOnMap = [];
 
         let trackingData = {
             track: [],
             pois: []
         };
 
-        const crosshair = document.getElementById('crosshair');
-        map.on('movestart', () => crosshair.classList.add('map-dragging'));
-        map.on('moveend', () => crosshair.classList.remove('map-dragging'));
-
         map.on('load', () => {
-            // Marker GPS Pengguna (Titik Biru)
+            // Layer Titik GPS Asli Pengguna
             map.addSource('user-location', {
                 type: 'geojson',
                 data: { type: 'FeatureCollection', features: [] }
@@ -343,7 +297,7 @@
                 type: 'circle',
                 source: 'user-location',
                 paint: {
-                    'circle-radius': 8,
+                    'circle-radius': 9,
                     'circle-color': '#007bff',
                     'circle-stroke-width': 3,
                     'circle-stroke-color': '#ffffff'
@@ -360,41 +314,7 @@
                 type: 'line',
                 source: 'track-line',
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#e71d36', 'line-width': 5, 'line-opacity': 0.85 }
-            });
-
-            // POI Layer Hasil Marking (Titik Biru POI)
-            map.addSource('poi-points', {
-                type: 'geojson',
-                data: { type: 'FeatureCollection', features: [] }
-            });
-            map.addLayer({
-                id: 'poi-layer',
-                type: 'circle',
-                source: 'poi-points',
-                paint: {
-                    'circle-radius': 8,
-                    'circle-color': '#3a86ff',
-                    'circle-stroke-width': 2,
-                    'circle-stroke-color': '#ffffff'
-                }
-            });
-
-            // Popup POI saat diklik
-            map.on('click', 'poi-layer', (e) => {
-                const coordinates = e.features[0].geometry.coordinates.slice();
-                const { title, desc, time } = e.features[0].properties;
-
-                new maplibregl.Popup()
-                    .setLngLat(coordinates)
-                    .setHTML(`
-                        <div style="color:#222; font-size:12px;">
-                            <strong style="color:#3a86ff; font-size:14px;">📍 ${title}</strong><br>
-                            ${desc ? `<p style="margin:4px 0;">${desc}</p>` : ''}
-                            <small style="color:#777;">${new Date(time).toLocaleString('id-ID')}</small>
-                        </div>
-                    `)
-                    .addTo(map);
+                paint: { 'line-color': '#e71d36', 'line-width': 5 }
             });
 
             loadFromLocalStorage();
@@ -407,22 +327,18 @@
                 timeout: 10000,
                 maximumAge: 0
             });
-        } else {
-            document.getElementById('status').innerText = "GPS Tidak Didukung";
         }
 
         function onPositionSuccess(position) {
             const lng = position.coords.longitude;
             const lat = position.coords.latitude;
             const accuracy = position.coords.accuracy;
-            const timestamp = new Date().toISOString();
 
             userPos = { lng, lat };
 
             document.getElementById('status').innerText = "Aktif";
             document.getElementById('accuracy').innerText = Math.round(accuracy);
 
-            // Tampilkan titik biru lokasi GPS
             if (map.getSource('user-location')) {
                 map.getSource('user-location').setData({
                     type: 'Feature',
@@ -430,33 +346,32 @@
                 });
             }
 
-            // Pertama kali terkunci, gerakkan kamera tepat ke titik biru GPS
             if (firstFix) {
                 centerToUserLocation();
                 firstFix = false;
             }
 
             if (isRecording) {
-                trackingData.track.push([lng, lat, timestamp]);
+                trackingData.track.push([lng, lat, new Date().toISOString()]);
                 renderTrack();
                 saveToLocalStorage();
             }
         }
 
         function onPositionError(err) {
-            document.getElementById('status').innerText = "Gagal: " + err.message;
+            document.getElementById('status').innerText = "Err: " + err.message;
         }
 
-        // Tombol Lokasi Saya: Geser kamera agar pusat layar tepat di atas titik biru GPS
+        // Geser Pusat Peta Tepat ke Titik GPS HP
         function centerToUserLocation() {
             if (userPos) {
                 map.flyTo({ 
                     center: [userPos.lng, userPos.lat], 
-                    zoom: 17, 
-                    pitch: is3D ? 60 : 0 
+                    zoom: 18,
+                    essential: true
                 });
             } else {
-                alert("Sinyal GPS belum terkunci...");
+                alert("GPS belum terkunci.");
             }
         }
 
@@ -464,7 +379,6 @@
             isRecording = !isRecording;
             const btn = document.getElementById('btnTrack');
             const txt = document.getElementById('txtTrack');
-
             if (isRecording) {
                 txt.innerText = "Stop";
                 btn.classList.add("recording");
@@ -476,16 +390,11 @@
 
         function toggle3D() {
             is3D = !is3D;
-            if (is3D) {
-                map.easeTo({ pitch: 60, duration: 800 });
-                document.getElementById('mode3DStatus').innerText = "Pitch 60°";
-            } else {
-                map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
-                document.getElementById('mode3DStatus').innerText = "Datar (2D)";
-            }
+            map.easeTo({ pitch: is3D ? 60 : 0, duration: 600 });
+            document.getElementById('mode3DStatus').innerText = is3D ? "3D (60°)" : "Datar (2D)";
         }
 
-        // FUNGSI MARKING: Membaca koordinat murni dari pusat piksel layar (Di bawah Ujung Jarum Pin Merah)
+        // Buka Modal Marking berdasarkan koordinat persis pusat peta (ujung jarum pin merah)
         function addPOIAtCenter() {
             const center = map.getCenter();
             selectedPoiPos = { lng: center.lng, lat: center.lat };
@@ -535,19 +444,41 @@
             document.getElementById('pointCount').innerText = trackingData.track.length;
         }
 
+        // Render POI menggunakan MapLibre Marker HTML agar anchor 'bottom' presisi 100%
         function renderPois() {
-            const features = trackingData.pois.map(poi => ({
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
-                properties: { title: poi.title, desc: poi.desc, time: poi.timestamp }
-            }));
+            // Hapus marker lama dari layar
+            poiMarkersOnMap.forEach(m => m.remove());
+            poiMarkersOnMap = [];
 
-            if (map.getSource('poi-points')) {
-                map.getSource('poi-points').setData({
-                    type: 'FeatureCollection',
-                    features: features
-                });
-            }
+            trackingData.pois.forEach(poi => {
+                // Buat elemen visual marker (Pin Oranye untuk membedakan dari Pin Merah Crosshair)
+                const el = document.createElement('div');
+                el.className = 'custom-poi-marker';
+                el.innerHTML = `
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#FF9F1C" stroke="#000" stroke-width="1">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                `;
+
+                const popup = new maplibregl.Popup({ offset: 25 }).setHTML(`
+                    <div style="color:#222; font-size:12px;">
+                        <strong style="color:#ff9f1c; font-size:13px;">📍 ${poi.title}</strong><br>
+                        ${poi.desc ? `<p style="margin:3px 0;">${poi.desc}</p>` : ''}
+                        <small style="color:#666;">${new Date(poi.timestamp).toLocaleString('id-ID')}</small>
+                    </div>
+                `);
+
+                const marker = new maplibregl.Marker({
+                    element: el,
+                    anchor: 'bottom' // Kunci ujung bawah pin tepat di koordinatnya
+                })
+                .setLngLat([poi.lng, poi.lat])
+                .setPopup(popup)
+                .addTo(map);
+
+                poiMarkersOnMap.push(marker);
+            });
+
             document.getElementById('poiCount').innerText = trackingData.pois.length;
         }
 
@@ -563,26 +494,21 @@
                     renderTrack();
                     renderPois();
                 } catch (e) {
-                    console.error("Gagal membaca storage", e);
+                    console.error(e);
                 }
             }
         }
 
         function exportJSON() {
             if (trackingData.track.length === 0 && trackingData.pois.length === 0) {
-                alert("Belum ada data untuk di-export.");
+                alert("Tidak ada data untuk diexport.");
                 return;
             }
-
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trackingData, null, 2));
-            const downloadAnchor = document.createElement('a');
-            const dateStr = new Date().toISOString().slice(0, 10);
-            
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `gps_3d_track_${dateStr}.json`);
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
+            const dl = document.createElement('a');
+            dl.setAttribute("href", dataStr);
+            dl.setAttribute("download", `gps_export_${new Date().toISOString().slice(0,10)}.json`);
+            dl.click();
         }
 
         function importJSON(event) {
@@ -592,28 +518,14 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const importedData = JSON.parse(e.target.result);
-                    if (importedData.track || importedData.pois) {
-                        trackingData = {
-                            track: importedData.track || [],
-                            pois: importedData.pois || []
-                        };
-                        renderTrack();
-                        renderPois();
-                        saveToLocalStorage();
-
-                        const bounds = new maplibregl.LngLatBounds();
-                        trackingData.track.forEach(p => bounds.extend([p[0], p[1]]));
-                        trackingData.pois.forEach(p => bounds.extend([p.lng, p.lat]));
-                        
-                        if (!bounds.isEmpty()) {
-                            map.fitBounds(bounds, { padding: 50 });
-                        }
-
-                        alert("Data JSON berhasil di-import!");
-                    }
+                    const data = JSON.parse(e.target.result);
+                    trackingData = { track: data.track || [], pois: data.pois || [] };
+                    renderTrack();
+                    renderPois();
+                    saveToLocalStorage();
+                    alert("Import berhasil!");
                 } catch (err) {
-                    alert("Gagal membaca JSON: " + err.message);
+                    alert("Format JSON tidak valid.");
                 }
             };
             reader.readAsText(file);
