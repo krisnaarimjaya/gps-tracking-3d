@@ -27,39 +27,26 @@
             width: 100vw;
         }
 
-        /* Center Crosshair Marker (Presisi Tanpa Offset) */
+        /* Container Crosshair Single Element (Presisi Tanpa Terpisah) */
         .center-crosshair {
             position: absolute;
             top: 50%;
             left: 50%;
-            z-index: 5;
+            z-index: 10;
             pointer-events: none;
+            /* Ujung bawah lancip pin ditempatkan tepat di koordinat (0,0) pusat layar */
+            transform: translate(-50%, -100%);
+            width: 36px;
+            height: 48px;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 0;
-            height: 0;
+            transition: transform 0.15s ease;
         }
-        .crosshair-pin {
-            position: absolute;
-            width: 36px;
-            height: 36px;
-            filter: drop-shadow(0px 3px 4px rgba(0,0,0,0.4));
-            transition: transform 0.2s ease;
-            transform: translate(-50%, -100%); /* Ujung bawah jarum tepat di titik (0,0) */
-        }
-        .crosshair-dot {
-            position: absolute;
-            width: 6px;
-            height: 6px;
-            background: #e71d36;
-            border: 2px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 4px rgba(0,0,0,0.5);
-            transform: translate(-50%, -50%); /* Titik tepat di pusat layar (0,0) */
-        }
-        .map-dragging .crosshair-pin {
-            transform: translate(-50%, -120%) scale(1.1);
+
+        /* Animasi saat peta digeser/diseret */
+        .map-dragging {
+            transform: translate(-50%, -115%) scale(1.08);
         }
         
         /* Stats Panel Header Top */
@@ -216,12 +203,12 @@
         <strong>Mode 3D:</strong> <span id="mode3DStatus">Datar (2D)</span>
     </div>
 
-    <!-- Pemandu Marker Tengah Layar (Presisi) -->
+    <!-- Pemandu Crosshair Tunggal (Single SVG Pin) -->
     <div class="center-crosshair" id="crosshair">
-        <svg class="crosshair-pin" viewBox="0 0 24 24" fill="#e71d36">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5-2.5z"/>
+        <svg width="36" height="48" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 0C8.05887 0 0 8.05887 0 18C0 28.5 18 48 18 48C18 48 36 28.5 36 18C36 8.05887 27.9411 0 18 0ZM18 25C14.134 25 11 21.866 11 18C11 14.134 14.134 11 18 11C21.866 11 25 14.134 25 18C25 21.866 21.866 25 18 25Z" fill="#E71D36" filter="drop-shadow(0px 3px 3px rgba(0,0,0,0.3))"/>
+            <circle cx="18" cy="18" r="4" fill="white"/>
         </svg>
-        <div class="crosshair-dot"></div>
     </div>
 
     <!-- Container Peta -->
@@ -376,7 +363,7 @@
                 paint: { 'line-color': '#e71d36', 'line-width': 5, 'line-opacity': 0.85 }
             });
 
-            // POI Layer Hasil Marking
+            // POI Layer Hasil Marking (Titik Biru POI)
             map.addSource('poi-points', {
                 type: 'geojson',
                 data: { type: 'FeatureCollection', features: [] }
@@ -460,7 +447,7 @@
             document.getElementById('status').innerText = "Gagal: " + err.message;
         }
 
-        // Tombol Lokasi Saya: Geser kamera agar pusat layar (crosshair merah) tepat di atas titik biru GPS
+        // Tombol Lokasi Saya: Geser kamera agar pusat layar tepat di atas titik biru GPS
         function centerToUserLocation() {
             if (userPos) {
                 map.flyTo({ 
@@ -498,7 +485,7 @@
             }
         }
 
-        // FUNGSI MARKING: Selalu membaca koordinat murni dari pusat piksel layar (Di bawah Crosshair Merah)
+        // FUNGSI MARKING: Membaca koordinat murni dari pusat piksel layar (Di bawah Ujung Jarum Pin Merah)
         function addPOIAtCenter() {
             const center = map.getCenter();
             selectedPoiPos = { lng: center.lng, lat: center.lat };
