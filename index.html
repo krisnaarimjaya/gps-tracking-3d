@@ -27,44 +27,40 @@
             width: 100vw;
         }
 
-        /* Center Crosshair Marker Presisi */
-.center-crosshair {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    z-index: 5;
-    pointer-events: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 0;
-    height: 0;
-}
-
-.crosshair-pin {
-    width: 36px;
-    height: 36px;
-    filter: drop-shadow(0px 3px 4px rgba(0,0,0,0.4));
-    transition: transform 0.2s ease;
-    /* Pindahkan ujung jarum pin agar sejajar dengan koordinat tengah (0,0) */
-    transform: translate(-50%, -100%); 
-}
-
-.crosshair-dot {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    background: #e71d36;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
-    box-shadow: 0 0 4px rgba(0,0,0,0.5);
-    /* Titik ditempatkan tepat di pusat layar (0,0) */
-    transform: translate(-50%, -50%); 
-}
-
-.map-dragging .crosshair-pin {
-    transform: translate(-50%, -120%) scale(1.1);
-}
+        /* Center Crosshair Marker (Presisi Tanpa Offset) */
+        .center-crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            z-index: 5;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 0;
+            height: 0;
+        }
+        .crosshair-pin {
+            position: absolute;
+            width: 36px;
+            height: 36px;
+            filter: drop-shadow(0px 3px 4px rgba(0,0,0,0.4));
+            transition: transform 0.2s ease;
+            transform: translate(-50%, -100%); /* Ujung bawah jarum tepat di titik (0,0) */
+        }
+        .crosshair-dot {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #e71d36;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 4px rgba(0,0,0,0.5);
+            transform: translate(-50%, -50%); /* Titik tepat di pusat layar (0,0) */
+        }
+        .map-dragging .crosshair-pin {
+            transform: translate(-50%, -120%) scale(1.1);
+        }
         
         /* Stats Panel Header Top */
         .stats-panel {
@@ -217,18 +213,18 @@
     <div class="stats-panel">
         <strong>GPS:</strong> <span id="status">Mencari...</span> (<span id="accuracy">-</span>m)<br>
         <strong>Track:</strong> <span id="pointCount">0</span> ptn | <strong>POI:</strong> <span id="poiCount">0</span><br>
-        <strong>Mode 3D:</strong> <span id="mode3DStatus">Pitch 60°</span>
+        <strong>Mode 3D:</strong> <span id="mode3DStatus">Datar (2D)</span>
     </div>
 
-    <!-- Pemandu Marker Tengah Layar Presisi -->
-<div class="center-crosshair" id="crosshair">
-    <svg class="crosshair-pin" viewBox="0 0 24 24" fill="#e71d36">
-        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-    </svg>
-    <div class="crosshair-dot"></div>
-</div>
+    <!-- Pemandu Marker Tengah Layar (Presisi) -->
+    <div class="center-crosshair" id="crosshair">
+        <svg class="crosshair-pin" viewBox="0 0 24 24" fill="#e71d36">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5-2.5z"/>
+        </svg>
+        <div class="crosshair-dot"></div>
+    </div>
 
-    <!-- Container Peta 3D -->
+    <!-- Container Peta -->
     <div id="map"></div>
 
     <!-- Tombol Floating: Lokasi Saya -->
@@ -238,39 +234,33 @@
         </svg>
     </button>
 
-    <!-- Tombol Kontrol Utama (Dock Bottom Bar) -->
+    <!-- Control Dock Bottom Bar -->
     <div class="controls">
-        <!-- Record Tracking -->
         <button class="btn-icon" id="btnTrack" onclick="toggleTracking()">
             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><circle cx="12" cy="12" r="5"/></svg>
             <span id="txtTrack">Rekam</span>
         </button>
 
-        <!-- Toggle 2D/3D -->
         <button class="btn-icon" id="btn3D" onclick="toggle3D()">
             <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             <span>3D</span>
         </button>
 
-        <!-- Marking POI -->
         <button class="btn-icon" id="btnPoi" onclick="addPOIAtCenter()">
             <svg viewBox="0 0 24 24"><path d="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
             <span>Marking</span>
         </button>
 
-        <!-- Export -->
         <button class="btn-icon" id="btnExport" onclick="exportJSON()">
             <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
             <span>Export</span>
         </button>
 
-        <!-- Import -->
         <button class="btn-icon" id="btnImport" onclick="document.getElementById('fileInput').click()">
             <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
             <span>Import</span>
         </button>
 
-        <!-- Clear -->
         <button class="btn-icon" id="btnClear" onclick="clearData()">
             <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             <span>Hapus</span>
@@ -333,33 +323,30 @@
                 }
             },
             center: [106.816666, -6.200000],
-            zoom: 15,
-            pitch: 60,
-            bearing: -17.6
+            zoom: 16,
+            pitch: 0,
+            bearing: 0
         });
 
-        // Kontrol Zoom & Navigasi
         map.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showCompass: true }), 'top-right');
 
-        // State Data
         let userPos = null;
         let selectedPoiPos = null;
         let isRecording = false;
         let firstFix = true;
-        let is3D = true;
+        let is3D = false;
 
         let trackingData = {
             track: [],
             pois: []
         };
 
-        // Efek Visual saat Peta Digeser (Map Dragging Animation)
         const crosshair = document.getElementById('crosshair');
         map.on('movestart', () => crosshair.classList.add('map-dragging'));
         map.on('moveend', () => crosshair.classList.remove('map-dragging'));
 
         map.on('load', () => {
-            // User Location Marker
+            // Marker GPS Pengguna (Titik Biru)
             map.addSource('user-location', {
                 type: 'geojson',
                 data: { type: 'FeatureCollection', features: [] }
@@ -369,7 +356,7 @@
                 type: 'circle',
                 source: 'user-location',
                 paint: {
-                    'circle-radius': 9,
+                    'circle-radius': 8,
                     'circle-color': '#007bff',
                     'circle-stroke-width': 3,
                     'circle-stroke-color': '#ffffff'
@@ -389,7 +376,7 @@
                 paint: { 'line-color': '#e71d36', 'line-width': 5, 'line-opacity': 0.85 }
             });
 
-            // POI Layer
+            // POI Layer Hasil Marking
             map.addSource('poi-points', {
                 type: 'geojson',
                 data: { type: 'FeatureCollection', features: [] }
@@ -406,7 +393,7 @@
                 }
             });
 
-            // Popup POI
+            // Popup POI saat diklik
             map.on('click', 'poi-layer', (e) => {
                 const coordinates = e.features[0].geometry.coordinates.slice();
                 const { title, desc, time } = e.features[0].properties;
@@ -426,7 +413,7 @@
             loadFromLocalStorage();
         });
 
-        // GPS Geolocation Watcher
+        // Geolocation Watcher
         if ('geolocation' in navigator) {
             navigator.geolocation.watchPosition(onPositionSuccess, onPositionError, {
                 enableHighAccuracy: true,
@@ -434,7 +421,7 @@
                 maximumAge: 0
             });
         } else {
-            document.getElementById('status').innerText = "GPS tidak didukung";
+            document.getElementById('status').innerText = "GPS Tidak Didukung";
         }
 
         function onPositionSuccess(position) {
@@ -448,16 +435,18 @@
             document.getElementById('status').innerText = "Aktif";
             document.getElementById('accuracy').innerText = Math.round(accuracy);
 
-            if (firstFix) {
-                map.flyTo({ center: [lng, lat], zoom: 16 });
-                firstFix = false;
-            }
-
+            // Tampilkan titik biru lokasi GPS
             if (map.getSource('user-location')) {
                 map.getSource('user-location').setData({
                     type: 'Feature',
                     geometry: { type: 'Point', coordinates: [lng, lat] }
                 });
+            }
+
+            // Pertama kali terkunci, gerakkan kamera tepat ke titik biru GPS
+            if (firstFix) {
+                centerToUserLocation();
+                firstFix = false;
             }
 
             if (isRecording) {
@@ -471,16 +460,19 @@
             document.getElementById('status').innerText = "Gagal: " + err.message;
         }
 
-        // Center Kamera ke Lokasi Saya
+        // Tombol Lokasi Saya: Geser kamera agar pusat layar (crosshair merah) tepat di atas titik biru GPS
         function centerToUserLocation() {
             if (userPos) {
-                map.flyTo({ center: [userPos.lng, userPos.lat], zoom: 17, pitch: is3D ? 60 : 0 });
+                map.flyTo({ 
+                    center: [userPos.lng, userPos.lat], 
+                    zoom: 17, 
+                    pitch: is3D ? 60 : 0 
+                });
             } else {
-                alert("Mencari sinyal GPS lokasi Anda...");
+                alert("Sinyal GPS belum terkunci...");
             }
         }
 
-        // Toggle Record Tracking
         function toggleTracking() {
             isRecording = !isRecording;
             const btn = document.getElementById('btnTrack');
@@ -495,7 +487,6 @@
             }
         }
 
-        // Toggle 2D / 3D Mode
         function toggle3D() {
             is3D = !is3D;
             if (is3D) {
@@ -507,17 +498,16 @@
             }
         }
 
-        // FUNGSI PERBAIKAN: Mengambil koordinat murni dari pusat layar (di bawah Crosshair Merah)
-function addPOIAtCenter() {
-    // Ambil titik koordinat tepat di bawah ikon crosshair merah (pusat kamera peta)
-    const center = map.getCenter();
-    selectedPoiPos = { lng: center.lng, lat: center.lat };
+        // FUNGSI MARKING: Selalu membaca koordinat murni dari pusat piksel layar (Di bawah Crosshair Merah)
+        function addPOIAtCenter() {
+            const center = map.getCenter();
+            selectedPoiPos = { lng: center.lng, lat: center.lat };
 
-    document.getElementById('poiCoordsText').innerText = `Koordinat: ${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`;
-    document.getElementById('poiTitle').value = '';
-    document.getElementById('poiDesc').value = '';
-    document.getElementById('poiModal').style.display = 'flex';
-}
+            document.getElementById('poiCoordsText').innerText = `Koordinat: ${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`;
+            document.getElementById('poiTitle').value = '';
+            document.getElementById('poiDesc').value = '';
+            document.getElementById('poiModal').style.display = 'flex';
+        }
 
         function closeModal() {
             document.getElementById('poiModal').style.display = 'none';
@@ -547,7 +537,6 @@ function addPOIAtCenter() {
             closeModal();
         }
 
-        // Render Functions
         function renderTrack() {
             const coords = trackingData.track.map(p => [p[0], p[1]]);
             if (map.getSource('track-line')) {
@@ -575,7 +564,6 @@ function addPOIAtCenter() {
             document.getElementById('poiCount').innerText = trackingData.pois.length;
         }
 
-        // Local Storage & Export / Import
         function saveToLocalStorage() {
             localStorage.setItem('maplibre_gps_data', JSON.stringify(trackingData));
         }
@@ -632,7 +620,7 @@ function addPOIAtCenter() {
                         trackingData.pois.forEach(p => bounds.extend([p.lng, p.lat]));
                         
                         if (!bounds.isEmpty()) {
-                            map.fitBounds(bounds, { padding: 50, pitch: 60 });
+                            map.fitBounds(bounds, { padding: 50 });
                         }
 
                         alert("Data JSON berhasil di-import!");
