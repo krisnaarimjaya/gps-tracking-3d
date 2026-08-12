@@ -501,14 +501,19 @@
 
         // Buka Modal Tambah POI Menggunakan Koordinat Pusat Layar (Center Crosshair)
         function addPOIAtCenter() {
-            const center = map.getCenter();
-            selectedPoiPos = { lng: center.lng, lat: center.lat };
+    if (!userPos) {
+        alert("Sinyal GPS belum terkunci. Tunggu sebentar!");
+        return;
+    }
+    
+    // Mengunci koordinat langsung dari sensor GPS pengguna
+    selectedPoiPos = { lng: userPos.lng, lat: userPos.lat };
 
-            document.getElementById('poiCoordsText').innerText = `Koordinat: ${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`;
-            document.getElementById('poiTitle').value = '';
-            document.getElementById('poiDesc').value = '';
-            document.getElementById('poiModal').style.display = 'flex';
-        }
+    document.getElementById('poiCoordsText').innerText = `Koordinat GPS: ${userPos.lat.toFixed(6)}, ${userPos.lng.toFixed(6)}`;
+    document.getElementById('poiTitle').value = '';
+    document.getElementById('poiDesc').value = '';
+    document.getElementById('poiModal').style.display = 'flex';
+}
 
         function closeModal() {
             document.getElementById('poiModal').style.display = 'none';
