@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GPS Tracking 3D Terrain - MapLibre & Carto</title>
+    
+    <!-- MapLibre GL CSS -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            height: 100%;
+            width: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #111;
+            overflow: hidden;
+        }
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        /* Stats Panel */
+        .stats-panel {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.92);
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+            backdrop-filter: blur(8px);
+            font-size: 13px;
+            line-height: 1.5;
+            color: #222;
+            max-width: 280px;
+        }
+        
+        /* Control Bar at Bottom */
+        .controls {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.92);
+            padding: 10px 14px;
+            border-radius: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            backdrop-filter: blur(8px);
+            max-width: 95vw;
+        }
+
+        button {
+            border: none;
+            padding: 9px 14px;
+            border-radius: 18px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #btnTrack {
+            background-color: #2ec4b6;
+            color: white;
+        }
+        #btnTrack.recording {
+            background-color: #e71d36;
+            animation: pulse 1.5s infinite;
+        }
+        #btn3D {
+            background-color: #ff9f1c;
+            color: white;
+        }
+        #btnPoi {
+            background-color: #3a86ff;
+            color: white;
+        }
+        #btnExport {
+            background-color: #8338ec;
+            color: white;
+        }
+        #btnImport {
+            background-color: #ff006e;
+            color: white;
+        }
+        #btnClear {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        /* Modal Form POI */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 340px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .modal-content h3 {
+            margin-bottom: 12px;
+            font-size: 16px;
+            color: #222;
+        }
+        .modal-content input, .modal-content textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Panel Informasi Status -->
+    <div class="stats-panel">
+        <strong>Status GPS:</strong> <span id="status">Mencari lokasi...</span><br>
+        <strong>Akurasi:</strong> <span id="accuracy">-</span> m<br>
+        <strong>Titik Track:</strong> <span id="pointCount">0</span><br>
+        <strong>Jumlah POI:</strong> <span id="poiCount">0</span><br>
+        <strong>Mode 3D:</strong> <span id="mode3DStatus">Aktif (Pitch 60°)</span>
+    </div>
+
+    <!-- Container Peta 3D -->
+    <div id="map"></div>
+
+    <!-- Tombol Kontrol Utama -->
+    <div class="controls">
+        <button id="btnTrack" onclick="toggleTracking()">⏺ Rekam</button>
+        <button id="btn3D" onclick="toggle3D()">⛰ Mode 2D/3D</button>
+        <button id="btnPoi" onclick="addPOI()">📍 POI</button>
+        <button id="btnExport" onclick="exportJSON()">📥 Export</button>
+        <button id="btnImport" onclick="document.getElementById('fileInput').click()">📤 Import</button>
+        <button id="btnClear" onclick="clearData()">🗑 Hapus</button>
+        
+        <input type="file" id="fileInput" accept=".json" style="display:none" onchange="importJSON(event)">
+    </div>
+
+    <!-- Modal Form POI -->
+    <div id="poiModal" class="modal">
+        <div class="modal-content">
+            <h3>Tambah POI Baru</h3>
+            <input type="text" id="poiTitle" placeholder="Nama Tempat / POI" required>
+            <textarea id="poiDesc" rows="3" placeholder="Keterangan singkat..."></textarea>
+            <div class="modal-actions">
+                <button type="button" style="background:#6c757d; color:white" onclick="closeModal()">Batal</button>
+                <button type="button" style="background:#2ec4b6; color:white" onclick="savePOI()">Simpan POI</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    
+    <script>
+        // Inisialisasi MapLibre dengan Kemiringan Awal (Pitch) 60 derajat untuk efek 3D
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    // Basemap CartoDB Positron
+                    'carto-tiles': {
+                        type: 'raster',
+                        tiles: [
+                            'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+                            'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+                        ],
+                        tileSize: 256,
+                        attribution: '&copy; OpenStreetMap &copy; CARTO'
+                    },
+                    // Sumber Terrain 3D (AWS Terrain RGB Tiles)
+                    'terrain-dem': {
+                        type: 'raster-dem',
+                        tiles: [
+                            'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+                        ],
+                        encoding: 'terrarium',
+                        tileSize: 256,
+                        maxzoom: 15
+                    }
+                },
+                layers: [
+                    {
+                        id: 'carto-layer',
+                        type: 'raster',
+                        source: 'carto-tiles',
+                        minzoom: 0,
+                        maxzoom: 22
+                    }
+                ],
+                terrain: {
+                    source: 'terrain-dem',
+                    exaggeration: 1.5 // Faktor Ketinggian Terrain 3D
+                }
+            },
+            center: [106.816666, -6.200000],
+            zoom: 15,
+            pitch: 60, // Kemiringan awal 3D
+            bearing: -17.6
+        });
+
+        // Tambahkan Kontrol Navigasi (Zoom & Kompas Rotasi)
+        map.addControl(new maplibregl.NavigationControl({
+            visualizePitch: true,
+            showCompass: true
+        }), 'top-right');
+
+        // State & Variabel Data
+        let currentPos = null;
+        let isRecording = false;
+        let firstFix = true;
+        let is3D = true;
+
+        let trackingData = {
+            track: [], // Array [ [lng, lat, alt, timestamp], ... ]
+            pois: []   // Array [ { id, title, desc, lng, lat, timestamp }, ... ]
+        };
+
+        // GeoJSON Sources & Layers
+        map.on('load', () => {
+            // Source untuk Marker GPS Pengguna
+            map.addSource('user-location', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+
+            // Layer Marker Posisi Saat Ini
+            map.addLayer({
+                id: 'user-location-layer',
+                type: 'circle',
+                source: 'user-location',
+                paint: {
+                    'circle-radius': 9,
+                    'circle-color': '#007bff',
+                    'circle-stroke-width': 3,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            // Source untuk Garis Tracking GPS
+            map.addSource('track-line', {
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    geometry: { type: 'LineString', coordinates: [] }
+                }
+            });
+
+            // Layer Garis Tracking
+            map.addLayer({
+                id: 'track-line-layer',
+                type: 'line',
+                source: 'track-line',
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#e71d36',
+                    'line-width': 6,
+                    'line-opacity': 0.9
+                }
+            });
+
+            // Source & Layer Marker POI
+            map.addSource('poi-points', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+
+            map.addLayer({
+                id: 'poi-layer',
+                type: 'circle',
+                source: 'poi-points',
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': '#ff006e',
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            // Klik POI Marker untuk menampilkan Popup
+            map.on('click', 'poi-layer', (e) => {
+                const coordinates = e.features[0].geometry.coordinates.slice();
+                const { title, desc, time } = e.features[0].properties;
+
+                new maplibregl.Popup()
+                    .setLngLat(coordinates)
+                    .setHTML(`
+                        <div style="color:#222; font-size:12px;">
+                            <strong style="color:#e71d36; font-size:14px;">📍 ${title}</strong><br>
+                            ${desc ? `<p style="margin:4px 0;">${desc}</p>` : ''}
+                            <small style="color:#777;">${new Date(time).toLocaleString('id-ID')}</small>
+                        </div>
+                    `)
+                    .addTo(map);
+            });
+
+            // Ubah kursor saat menyorot POI
+            map.on('mouseenter', 'poi-layer', () => map.getCanvas().style.cursor = 'pointer');
+            map.on('mouseleave', 'poi-layer', () => map.getCanvas().style.cursor = '');
+
+            loadFromLocalStorage();
+        });
+
+        // Geolocation GPS
+        if ('geolocation' in navigator) {
+            navigator.geolocation.watchPosition(onPositionSuccess, onPositionError, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
+        } else {
+            document.getElementById('status').innerText = "GPS tidak didukung";
+        }
+
+        function onPositionSuccess(position) {
+            const lng = position.coords.longitude;
+            const lat = position.coords.latitude;
+            const accuracy = position.coords.accuracy;
+            const timestamp = new Date().toISOString();
+
+            currentPos = { lng, lat };
+
+            document.getElementById('status').innerText = "Aktif";
+            document.getElementById('accuracy').innerText = Math.round(accuracy);
+
+            // Pindah kamera saat GPS pertama kali terkunci
+            if (firstFix) {
+                map.flyTo({ center: [lng, lat], zoom: 16, pitch: 60 });
+                firstFix = false;
+            }
+
+            // Update Lokasi Pengguna
+            if (map.getSource('user-location')) {
+                map.getSource('user-location').setData({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [lng, lat] }
+                });
+            }
+
+            // Rekam Titik Koordinat jika Status Aktif
+            if (isRecording) {
+                trackingData.track.push([lng, lat, timestamp]);
+                renderTrack();
+                saveToLocalStorage();
+            }
+        }
+
+        function onPositionError(err) {
+            document.getElementById('status').innerText = "Gagal: " + err.message;
+        }
+
+        // Toggle Rekam Tracking
+        function toggleTracking() {
+            isRecording = !isRecording;
+            const btn = document.getElementById('btnTrack');
+
+            if (isRecording) {
+                btn.innerText = "⏹ Hentikan";
+                btn.classList.add("recording");
+            } else {
+                btn.innerText = "⏺ Rekam";
+                btn.classList.remove("recording");
+            }
+        }
+
+        // Toggle Sudut Tampilan 2D / 3D
+        function toggle3D() {
+            is3D = !is3D;
+            if (is3D) {
+                map.easeTo({ pitch: 60, duration: 1000 });
+                document.getElementById('mode3DStatus').innerText = "Aktif (Pitch 60°)";
+            } else {
+                map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
+                document.getElementById('mode3DStatus').innerText = "Datar (2D)";
+            }
+        }
+
+        // Modal Form POI
+        function addPOI() {
+            if (!currentPos) {
+                alert("Lokasi GPS belum ditemukan. Harap tunggu sebentar.");
+                return;
+            }
+            document.getElementById('poiTitle').value = '';
+            document.getElementById('poiDesc').value = '';
+            document.getElementById('poiModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('poiModal').style.display = 'none';
+        }
+
+        function savePOI() {
+            const title = document.getElementById('poiTitle').value.trim();
+            const desc = document.getElementById('poiDesc').value.trim();
+
+            if (!title) {
+                alert("Nama POI wajib diisi!");
+                return;
+            }
+
+            const newPoi = {
+                id: Date.now(),
+                title: title,
+                desc: desc,
+                lng: currentPos.lng,
+                lat: currentPos.lat,
+                timestamp: new Date().toISOString()
+            };
+
+            trackingData.pois.push(newPoi);
+            renderPois();
+            saveToLocalStorage();
+            closeModal();
+        }
+
+        // Render Garis Track
+        function renderTrack() {
+            const coords = trackingData.track.map(p => [p[0], p[1]]);
+            if (map.getSource('track-line')) {
+                map.getSource('track-line').setData({
+                    type: 'Feature',
+                    geometry: { type: 'LineString', coordinates: coords }
+                });
+            }
+            document.getElementById('pointCount').innerText = trackingData.track.length;
+        }
+
+        // Render Penanda POI
+        function renderPois() {
+            const features = trackingData.pois.map(poi => ({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
+                properties: {
+                    title: poi.title,
+                    desc: poi.desc,
+                    time: poi.timestamp
+                }
+            }));
+
+            if (map.getSource('poi-points')) {
+                map.getSource('poi-points').setData({
+                    type: 'FeatureCollection',
+                    features: features
+                });
+            }
+            document.getElementById('poiCount').innerText = trackingData.pois.length;
+        }
+
+        // Storage & Export / Import
+        function saveToLocalStorage() {
+            localStorage.setItem('maplibre_gps_data', JSON.stringify(trackingData));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('maplibre_gps_data');
+            if (saved) {
+                try {
+                    trackingData = JSON.parse(saved);
+                    renderTrack();
+                    renderPois();
+                } catch (e) {
+                    console.error("Gagal membaca storage", e);
+                }
+            }
+        }
+
+        function exportJSON() {
+            if (trackingData.track.length === 0 && trackingData.pois.length === 0) {
+                alert("Belum ada data untuk di-export.");
+                return;
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trackingData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            const dateStr = new Date().toISOString().slice(0, 10);
+            
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `gps_3d_track_${dateStr}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (importedData.track || importedData.pois) {
+                        trackingData = {
+                            track: importedData.track || [],
+                            pois: importedData.pois || []
+                        };
+                        renderTrack();
+                        renderPois();
+                        saveToLocalStorage();
+
+                        // Auto Zoom FitBounds ke Data yang di-import
+                        const bounds = new maplibregl.LngLatBounds();
+                        trackingData.track.forEach(p => bounds.extend([p[0], p[1]]));
+                        trackingData.pois.forEach(p => bounds.extend([p.lng, p.lat]));
+                        
+                        if (!bounds.isEmpty()) {
+                            map.fitBounds(bounds, { padding: 50, pitch: 60 });
+                        }
+
+                        alert("Data JSON berhasil di-import!");
+                    }
+                } catch (err) {
+                    alert("Gagal membaca JSON: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearData() {
+            if (confirm("Hapus seluruh data track dan POI?")) {
+                trackingData = { track: [], pois: [] };
+                renderTrack();
+                renderPois();
+                localStorage.removeItem('maplibre_gps_data');
+            }
+        }
+    </script>
+</body>
+</html>
