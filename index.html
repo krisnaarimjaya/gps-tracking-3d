@@ -15,16 +15,21 @@
             padding: 0;
             -webkit-tap-highlight-color: transparent;
         }
-        body, html {
+        html, body {
             height: 100%;
             width: 100%;
+            margin: 0;
+            padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: #111;
             overflow: hidden;
         }
         #map {
+            position: relative;
             height: 100vh;
+            height: 100dvh;
             width: 100vw;
+            overflow: hidden;
         }
 
         /* CROSSHAIR PIN MERAH DENGAN ANCHOR PRESISI */
@@ -177,14 +182,14 @@
         <strong>Mode:</strong> <span id="mode3DStatus">Datar (2D)</span>
     </div>
 
-    <!-- CROSSHAIR PIN MERAH STATIS (Pusat Layar Presisi) -->
-    <div class="center-crosshair">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#E71D36" stroke="#FFFFFF" stroke-width="1"/>
-        </svg>
+    <div id="map">
+        <!-- CROSSHAIR PIN MERAH: diposisikan relatif terhadap viewport MAP, bukan body -->
+        <div class="center-crosshair">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#E71D36" stroke="#FFFFFF" stroke-width="1"/>
+            </svg>
+        </div>
     </div>
-
-    <div id="map"></div>
 
     <!-- Tombol Lokasi Saya -->
     <button class="btn-my-location" onclick="centerToUserLocation()" title="Ke Lokasi Saya">
@@ -278,6 +283,8 @@
         let selectedPoiPos = null;
         let isRecording = false;
         let firstFix = true;
+        let mapReady = false;
+        let initialGpsLockUntil = 0;
         let is3D = false;
         let poiMarkersOnMap = [];
 
@@ -318,6 +325,15 @@
             });
 
             loadFromLocalStorage();
+
+            // GPS bisa mendapatkan fix sebelum MapLibre selesai load.
+            // Setelah map siap, pusatkan ke posisi GPS terbaru secara instan.
+            mapReady = true;
+            if (userPos && firstFix) {
+                centerToUserLocation(true);
+                firstFix = false;
+                initialGpsLockUntil = Date.now() + 1500;
+            }
         });
 
         // Geolocation Watcher
@@ -339,16 +355,24 @@
             document.getElementById('status').innerText = "Aktif";
             document.getElementById('accuracy').innerText = Math.round(accuracy);
 
-            if (map.getSource('user-location')) {
+            if (mapReady && map.getSource('user-location')) {
                 map.getSource('user-location').setData({
                     type: 'Feature',
                     geometry: { type: 'Point', coordinates: [lng, lat] }
                 });
             }
 
-            if (firstFix) {
-                centerToUserLocation();
-                firstFix = false;
+            // Pada load pertama, GPS HP sering mengirim beberapa fix berurutan.
+            // Selama 1.5 detik awal, pusat peta mengikuti fix TERBARU supaya
+            // titik biru dan ujung pin merah benar-benar berimpit setelah lock.
+            if (mapReady) {
+                if (firstFix) {
+                    centerToUserLocation(true);
+                    firstFix = false;
+                    initialGpsLockUntil = Date.now() + 1500;
+                } else if (Date.now() < initialGpsLockUntil) {
+                    centerToUserLocation(true);
+                }
             }
 
             if (isRecording) {
@@ -363,16 +387,45 @@
         }
 
         // Geser Pusat Peta Tepat ke Titik GPS HP
-        function centerToUserLocation() {
-            if (userPos) {
-                map.flyTo({ 
-                    center: [userPos.lng, userPos.lat], 
+        function centerToUserLocation(instant = false) {
+            if (!userPos || !mapReady) {
+                if (!userPos) alert("GPS belum terkunci.");
+                return;
+            }
+
+            const center = [userPos.lng, userPos.lat];
+
+            if (instant) {
+                // Tidak ada animasi pada initial GPS lock. Ini mencegah
+                // crosshair dan titik GPS terlihat offset saat halaman pertama dibuka.
+                map.jumpTo({
+                    center: center,
+                    zoom: 18
+                });
+            } else {
+                // Animasi hanya untuk tombol "Lokasi Saya" yang ditekan pengguna.
+                map.flyTo({
+                    center: center,
                     zoom: 18,
                     essential: true
                 });
-            } else {
-                alert("GPS belum terkunci.");
             }
+        }
+
+        // Sinkronkan ukuran canvas MapLibre dengan viewport mobile yang dinamis
+        // (address bar Chrome/Android dapat muncul dan menghilang).
+        let resizeFrame = null;
+        function syncMapViewport() {
+            if (resizeFrame) cancelAnimationFrame(resizeFrame);
+            resizeFrame = requestAnimationFrame(() => {
+                resizeFrame = null;
+                if (mapReady) map.resize();
+            });
+        }
+
+        window.addEventListener('resize', syncMapViewport, { passive: true });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncMapViewport, { passive: true });
         }
 
         function toggleTracking() {
